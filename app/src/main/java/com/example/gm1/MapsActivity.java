@@ -1,5 +1,6 @@
 package com.example.gm1;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -8,6 +9,7 @@ import androidx.fragment.app.FragmentActivity;
 
 import android.Manifest;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -18,6 +20,7 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Display;
@@ -32,7 +35,10 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnMarkerDragListener;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -50,18 +56,26 @@ import java.util.Date;
 import static android.os.Build.VERSION_CODES.M;
 import static java.util.Collections.*;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,LocListenerInterface {
 
     private GoogleMap mMap;
     private int flagMap = 1;
     private int Marker_poz, delMarker_poz = 0;
     private Marker mCurrentMark;
+    Circle myCirclePoz;
     final String TAG = "myLogs";
     private ArrayList<Marker> mMarkerArrayList = new ArrayList<Marker>();
     private ArrayList<LatLng> myCoordArrayList = new ArrayList<LatLng>();
     private PolylineOptions polylineOptions = new PolylineOptions();
     private Polyline polylineMarshrut;
+
+    //**************************
     private LocationManager locationManager;
+    private TextView tvDistance,tvVelocity,tvkoord;
+    private Location lastLocation;
+    private MyLocListener myLocListener;
+    private int distance;
+    //*****************************
 
 
     @Override
@@ -88,17 +102,49 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      * installed Google Play services and returned to the app.
      */
 
+    //**************************************
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 100 && grantResults[0] ==RESULT_OK)
+        {
+            checkPermissions();
+        }
+    }
+
+    private void checkPermissions()
+    {
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION )!= PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+        {
+            requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION}, 100 );
+        }
+        else
+        {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,2,1,myLocListener);
+        }
+    }
+    //**************************************
+
     private void init() {
+
+        //**********************************
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        myLocListener = new MyLocListener();
+        tvDistance = findViewById(R.id.tvDistance);
+        tvVelocity = findViewById(R.id.tvVelocity);
+        myLocListener.setLocListenerInterface(this);
+        checkPermissions();
+        //**********************************
 
         mMap.setOnMarkerDragListener(new OnMarkerDragListener() {
            private int del_poz = -1;
             @Override
             public void onMarkerDragStart(com.google.android.gms.maps.model.Marker marker) {
-              //  myCoordArrayList.remove(marker.getPosition());
                 mCurrentMark =marker;
                 del_poz = mMarkerArrayList.indexOf(marker);
-                //mMarkerArrayList.remove(marker);
-
             }
 
             @Override
@@ -205,19 +251,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private void setUpMap() {      //создаем координаты для позиции камеры с центром в городе Киев
         LatLng positions = new LatLng(50.452842, 30.524418);      //перемещаем камеру и оттдаляем ее что мы можно было увидеть город
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(positions, 10));      //Добавляем маркер с местоположением на Крещатике
-        mMap.addMarker(new MarkerOptions().position(new LatLng(50.450137, 30.524180)).title("Крещатик"));
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(positions, 5));      //Добавляем маркер с местоположением на Крещатике
+       // mMap.addMarker(new MarkerOptions().position(new LatLng(50.450137, 30.524180)).title("Крещатик"));
+        mMap.addMarker(new MarkerOptions().position(positions).title("Крещатик"));
     }
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-
         setUpMap();
         init();
         polylineMarshrut = mMap.addPolyline(new PolylineOptions()
@@ -234,7 +275,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     public void DelMarker(View view) {
        if (delMarker_poz != -1) {
-
            mCurrentMark = mMarkerArrayList.get(delMarker_poz);
            mMarkerArrayList.remove(delMarker_poz);
            mCurrentMark.remove();
@@ -242,24 +282,44 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
            TextView mTv = findViewById(R.id.textView2);
            mTv.setTextColor(Color.GRAY);
            mTv.setText("Кнопка");
-
        }
-
     }
 
     public void onClickRoute(View view) {
-       // mMarkerArrayList.sort(Comparator<Marker.>);
-
-
         if(!myCoordArrayList.isEmpty()) {
             // Create polyline options with existing LatLng ArrayList
             polylineOptions.addAll(myCoordArrayList);
             polylineOptions
                     .width(5)
                     .color(Color.RED);
-
-// Adding multiple points in map using polyline and arraylist
             mMap.addPolyline(polylineOptions);
         }
+    }
+
+    @Override
+    public void OnLocationChanged(Location loc) {
+        if(loc.hasSpeed() && lastLocation != null)
+        {
+            distance += lastLocation.distanceTo(loc);
+        }
+        lastLocation = loc;
+        tvDistance.setText(String.valueOf(distance));
+        tvVelocity.setText(String.valueOf(loc.getSpeed()));
+
+        LatLng myPoz = new LatLng(loc.getLatitude(),loc.getLongitude());
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(myPoz, 17));
+       // mMap.addMarker(new MarkerOptions().position(myPoz).title("МОЕ"));
+        CircleOptions circleOptions = new CircleOptions()
+                .center(myPoz).radius(3)
+                .fillColor(Color.BLUE).strokeColor(Color.WHITE)
+                .strokeWidth(5);
+
+        Circle nowCircle =  mMap.addCircle(circleOptions);
+
+        if (myCirclePoz!=null) {
+            myCirclePoz.remove();
+        }
+        myCirclePoz = nowCircle;
+
     }
 }
