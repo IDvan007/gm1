@@ -9,12 +9,14 @@ import androidx.fragment.app.FragmentActivity;
 import android.Manifest;
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.icu.text.CaseMap;
 import android.icu.text.CaseMap.Title;
 import android.location.Criteria;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -43,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Date;
 
 import static android.os.Build.VERSION_CODES.M;
 import static java.util.Collections.*;
@@ -58,6 +61,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private ArrayList<LatLng> myCoordArrayList = new ArrayList<LatLng>();
     private PolylineOptions polylineOptions = new PolylineOptions();
     private Polyline polylineMarshrut;
+    private LocationManager locationManager;
 
 
     @Override
@@ -69,6 +73,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .findFragmentById(R.id.map);
         //mapFragment.getMapAsync(this);
         mapFragment.getMapAsync(this);
+
+        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
     }
 
     /**
@@ -84,9 +91,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private void init() {
 
         mMap.setOnMarkerDragListener(new OnMarkerDragListener() {
+           private int del_poz = -1;
             @Override
             public void onMarkerDragStart(com.google.android.gms.maps.model.Marker marker) {
-                myCoordArrayList.remove(marker.getPosition());
+              //  myCoordArrayList.remove(marker.getPosition());
+                mCurrentMark =marker;
+                del_poz = mMarkerArrayList.indexOf(marker);
+                //mMarkerArrayList.remove(marker);
 
             }
 
@@ -98,8 +109,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             @Override
             public void onMarkerDragEnd(com.google.android.gms.maps.model.Marker marker) {
                 marker.setSnippet(String.valueOf(marker.getPosition()));
-                myCoordArrayList.add(marker.getPosition());
-
+                mCurrentMark.setPosition(marker.getPosition());
+                if (del_poz!=-1)   {
+                    mMarkerArrayList.set(del_poz,mCurrentMark);
+                    del_poz = -1;
+                }
             }
         });
 
@@ -145,8 +159,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                         .title((Integer.toString(Marker_poz))).snippet(String.valueOf(latLng)).draggable(true);
 
                 mCurrentMark = mMap.addMarker(marker_onclick);
-                myCoordArrayList.add(latLng);
-               // mMap.addMarker(marker_onclick);
+               // myCoordArrayList.add(latLng);
                 mMarkerArrayList.add(mCurrentMark);
             }
         });
@@ -204,10 +217,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         LatLng sydney = new LatLng(-34, 151);
         mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-       /* mTxtView = (TextView) findViewById(R.id.textView);
-        ViewGroup.LayoutParams params = mTxtView.getLayoutParams();
-        params.width = params.width /3 *2;
-        mTxtView.setLayoutParams(params);*/
+
         setUpMap();
         init();
         polylineMarshrut = mMap.addPolyline(new PolylineOptions()
@@ -225,7 +235,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void DelMarker(View view) {
        if (delMarker_poz != -1) {
 
-        //   mCurrentMark = mMarkerArrayList.get(delMarker);
+           mCurrentMark = mMarkerArrayList.get(delMarker_poz);
            mMarkerArrayList.remove(delMarker_poz);
            mCurrentMark.remove();
            delMarker_poz= -1;
