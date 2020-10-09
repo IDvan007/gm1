@@ -65,13 +65,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     Circle myCirclePoz;
     final String TAG = "myLogs";
     private ArrayList<Marker> mMarkerArrayList = new ArrayList<Marker>();
-    private ArrayList<LatLng> myCoordArrayList = new ArrayList<LatLng>();
     private PolylineOptions polylineOptions = new PolylineOptions();
     private Polyline polylineMarshrut;
 
     //**************************
     private LocationManager locationManager;
-    private TextView tvDistance,tvVelocity,tvkoord;
+    private TextView tvDistance,tvVelocity,txttemp;
     private Location lastLocation;
     private MyLocListener myLocListener;
     private int distance;
@@ -135,6 +134,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         myLocListener = new MyLocListener();
         tvDistance = findViewById(R.id.tvDistance);
         tvVelocity = findViewById(R.id.tvVelocity);
+        txttemp = findViewById(R.id.txttemp);
         myLocListener.setLocListenerInterface(this);
         checkPermissions();
         //**********************************
@@ -145,6 +145,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             public void onMarkerDragStart(com.google.android.gms.maps.model.Marker marker) {
                 mCurrentMark =marker;
                 del_poz = mMarkerArrayList.indexOf(marker);
+                txttemp.setText(String.valueOf(mMarkerArrayList.size()));
+                //mMarkerArrayList.remove(marker);
             }
 
             @Override
@@ -160,6 +162,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     mMarkerArrayList.set(del_poz,mCurrentMark);
                     del_poz = -1;
                 }
+                txttemp.setText(String.valueOf(mMarkerArrayList.size()));
             }
         });
 
@@ -170,6 +173,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 mTv.setTextColor(Color.RED);
                 mTv.setText("Удалить маркер " + marker.getTitle());
                 delMarker_poz = mMarkerArrayList.indexOf(marker);
+                txttemp.setText(String.valueOf(mMarkerArrayList.size()));
                 return false;
             }
         });
@@ -183,6 +187,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 mTv.setTextColor(Color.GRAY);
                 mTv.setText("Кнопка");
                 delMarker_poz= -1;
+                txttemp.setText(String.valueOf(mMarkerArrayList.size()));
 
                 /*Toast toast = Toast.makeText(getApplicationContext(),
                         "32e23e23e23e2e23!",
@@ -207,6 +212,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 mCurrentMark = mMap.addMarker(marker_onclick);
                // myCoordArrayList.add(latLng);
                 mMarkerArrayList.add(mCurrentMark);
+                txttemp.setText(String.valueOf(mMarkerArrayList.size()));
             }
         });
 
@@ -286,14 +292,76 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     public void onClickRoute(View view) {
-        if(!myCoordArrayList.isEmpty()) {
+        if(!mMarkerArrayList.isEmpty()) {
+            //mMarkerArrayList.sort(Marker);
+            //Collections.sort(mMarkerArrayList);
+            ArrayList<LatLng> mCoordArrayList = new ArrayList<LatLng>();
+            for (Marker i: mMarkerArrayList)
+            {
+                mCoordArrayList.add(i.getPosition());
+            }
             // Create polyline options with existing LatLng ArrayList
-            polylineOptions.addAll(myCoordArrayList);
+
+            polylineOptions.addAll(mCoordArrayList);
             polylineOptions
                     .width(5)
                     .color(Color.RED);
-            mMap.addPolyline(polylineOptions);
+           //if (polylineMarshrut!=null)
+        //   {
+               polylineMarshrut.remove();
+         //  }
+           polylineMarshrut = mMap.addPolyline(polylineOptions);
+           mCoordArrayList.clear();
         }
+
+        //************************************************
+
+        //Получаем контекст для запросов, mapsApiKey хранит в себе String с ключом для карт
+        GeoApiContext geoApiContext = new GeoApiContext.Builder()
+                .apiKey(mapsApiKey)
+                .build();
+
+//Здесь будет наш итоговый путь состоящий из набора точек
+        DirectionsResult result = null;
+        try {
+            result = DirectionsApi.newRequest(geoApiContext)
+                    .origin(places.get(0))//Место старта
+                    .destination(places.get(places.size() - 1))//Пункт назначения
+                    .waypoints(places.get(1), places.get(2)).await();//Промежуточные точки. Да, не очень красиво, можно через цикл, но зато наглядно
+        } catch (ApiException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+//Преобразование итогового пути в набор точек
+        List<com.google.maps.model.LatLng> path = result.routes[0].overviewPolyline.decodePath();
+
+//Линия которую будем рисовать
+        PolylineOptions line = new PolylineOptions();
+
+        LatLngBounds.Builder latLngBuilder = new LatLngBounds.Builder();
+
+//Проходимся по всем точкам, добавляем их в Polyline и в LanLngBounds.Builder
+        for (int i = 0; i < path.size(); i++) {
+            line.add(new com.google.android.gms.maps.model.LatLng(path.get(i).lat, path.get(i).lng));
+            latLngBuilder.include(new com.google.android.gms.maps.model.LatLng(path.get(i).lat, path.get(i).lng));
+        }
+
+//Делаем линию более менее симпатичное
+        line.width(16f).color(R.color.colorPrimary);
+
+//Добавляем линию на карту
+        googleMap.addPolyline(line);
+
+//Выставляем камеру на нужную нам позицию
+        LatLngBounds latLngBounds = latLngBuilder.build();
+        CameraUpdate track = CameraUpdateFactory.newLatLngBounds(latLngBounds, width, width, 25);//width это размер нашего экрана
+        googleMap.moveCamera(track);
+
+        //************************************************
     }
 
     @Override
@@ -320,6 +388,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             myCirclePoz.remove();
         }
         myCirclePoz = nowCircle;
-
+        txttemp.setText(String.valueOf(mMarkerArrayList.size()));
     }
 }
