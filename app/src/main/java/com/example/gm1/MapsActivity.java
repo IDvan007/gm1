@@ -30,6 +30,8 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.common.api.ApiException;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.OnMarkerDragListener;
@@ -40,6 +42,7 @@ import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
@@ -47,6 +50,7 @@ import com.google.android.gms.maps.model.PolylineOptions;
 
 import org.w3c.dom.Text;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -313,55 +317,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
            polylineMarshrut = mMap.addPolyline(polylineOptions);
            mCoordArrayList.clear();
         }
+    }
 
-        //************************************************
-
-        //Получаем контекст для запросов, mapsApiKey хранит в себе String с ключом для карт
-        GeoApiContext geoApiContext = new GeoApiContext.Builder()
-                .apiKey(mapsApiKey)
-                .build();
-
-//Здесь будет наш итоговый путь состоящий из набора точек
-        DirectionsResult result = null;
-        try {
-            result = DirectionsApi.newRequest(geoApiContext)
-                    .origin(places.get(0))//Место старта
-                    .destination(places.get(places.size() - 1))//Пункт назначения
-                    .waypoints(places.get(1), places.get(2)).await();//Промежуточные точки. Да, не очень красиво, можно через цикл, но зато наглядно
-        } catch (ApiException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-//Преобразование итогового пути в набор точек
-        List<com.google.maps.model.LatLng> path = result.routes[0].overviewPolyline.decodePath();
-
-//Линия которую будем рисовать
-        PolylineOptions line = new PolylineOptions();
-
-        LatLngBounds.Builder latLngBuilder = new LatLngBounds.Builder();
-
-//Проходимся по всем точкам, добавляем их в Polyline и в LanLngBounds.Builder
-        for (int i = 0; i < path.size(); i++) {
-            line.add(new com.google.android.gms.maps.model.LatLng(path.get(i).lat, path.get(i).lng));
-            latLngBuilder.include(new com.google.android.gms.maps.model.LatLng(path.get(i).lat, path.get(i).lng));
-        }
-
-//Делаем линию более менее симпатичное
-        line.width(16f).color(R.color.colorPrimary);
-
-//Добавляем линию на карту
-        googleMap.addPolyline(line);
-
-//Выставляем камеру на нужную нам позицию
-        LatLngBounds latLngBounds = latLngBuilder.build();
-        CameraUpdate track = CameraUpdateFactory.newLatLngBounds(latLngBounds, width, width, 25);//width это размер нашего экрана
-        googleMap.moveCamera(track);
-
-        //************************************************
+    private void drowmyway(LatLng lastloc, LatLng newloc) {
+        PolylineOptions polylineOptions = new PolylineOptions();
+        polylineOptions.add(lastloc,newloc);
+        polylineOptions
+                .width(5)
+                .color(Color.BLUE);
+        mMap.addPolyline(polylineOptions);
     }
 
     @Override
@@ -369,13 +333,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if(loc.hasSpeed() && lastLocation != null)
         {
             distance += lastLocation.distanceTo(loc);
+            drowmyway(new LatLng(lastLocation.getLatitude(),lastLocation.getLongitude()),new LatLng(loc.getLatitude(),loc.getLongitude()));
         }
         lastLocation = loc;
         tvDistance.setText(String.valueOf(distance));
         tvVelocity.setText(String.valueOf(loc.getSpeed()));
 
         LatLng myPoz = new LatLng(loc.getLatitude(),loc.getLongitude());
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(myPoz, 17));
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(myPoz, 20));
        // mMap.addMarker(new MarkerOptions().position(myPoz).title("МОЕ"));
         CircleOptions circleOptions = new CircleOptions()
                 .center(myPoz).radius(3)
@@ -389,5 +354,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         myCirclePoz = nowCircle;
         txttemp.setText(String.valueOf(mMarkerArrayList.size()));
+
     }
 }
