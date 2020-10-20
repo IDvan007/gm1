@@ -7,7 +7,11 @@ public class MyLocListener implements LocationListener {
     private LocListenerInterface locListenerInterface;
     @Override
     public void onLocationChanged(Location location) {
-        locListenerInterface.OnLocationChanged(location);
+        try {
+            locListenerInterface.OnLocationChanged(location);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override

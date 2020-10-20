@@ -6,7 +6,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
-
+import java.io.*;
 import android.Manifest;
 import android.app.Dialog;
 import android.content.Context;
@@ -27,6 +27,7 @@ import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -60,9 +61,11 @@ import java.util.Date;
 import static android.os.Build.VERSION_CODES.M;
 import static java.util.Collections.*;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,LocListenerInterface {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback,LocListenerInterface  {
 
     private GoogleMap mMap;
+    private boolean wr_marsh_flag = false;
+    private FileWriter write_marsh;
     private int flagMap = 1;
     private int Marker_poz, delMarker_poz = 0;
     private Marker mCurrentMark;
@@ -75,6 +78,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     //**************************
     private LocationManager locationManager;
     private TextView tvDistance,tvVelocity,txttemp;
+    private Button button_wr_marsh;
     private Location lastLocation;
     private MyLocListener myLocListener;
     private int distance;
@@ -139,6 +143,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         tvDistance = findViewById(R.id.tvDistance);
         tvVelocity = findViewById(R.id.tvVelocity);
         txttemp = findViewById(R.id.txttemp);
+        button_wr_marsh = findViewById(R.id.wr_marsh);
         myLocListener.setLocListenerInterface(this);
         checkPermissions();
         //**********************************
@@ -329,11 +334,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     @Override
-    public void OnLocationChanged(Location loc) {
+    public void OnLocationChanged(Location loc) throws Exception{
         if(loc.hasSpeed() && lastLocation != null)
         {
             distance += lastLocation.distanceTo(loc);
-            drowmyway(new LatLng(lastLocation.getLatitude(),lastLocation.getLongitude()),new LatLng(loc.getLatitude(),loc.getLongitude()));
+            if (wr_marsh_flag) {
+                drowmyway(new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude()), new LatLng(loc.getLatitude(), loc.getLongitude()));
+                write_marsh.write(String.valueOf(loc.getLatitude()) +" " +String.valueOf(loc.getLongitude())+" "+"\n");
+            }
         }
         lastLocation = loc;
         tvDistance.setText(String.valueOf(distance));
@@ -355,5 +363,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         myCirclePoz = nowCircle;
         txttemp.setText(String.valueOf(mMarkerArrayList.size()));
 
+    }
+
+    public void wr_marsh(View view) throws Exception {
+        if (wr_marsh_flag=false) {
+            write_marsh = new FileWriter( "route.txt" );
+            wr_marsh_flag = true;
+            button_wr_marsh.setText("writing M...");
+        }
+        else {
+            write_marsh.close();
+            wr_marsh_flag = false;
+            button_wr_marsh.setText("@string/wr_marsh");
+        }
     }
 }
