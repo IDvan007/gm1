@@ -343,7 +343,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 write_marsh.write(String.valueOf(loc.getLatitude()) +" " +String.valueOf(loc.getLongitude())+" "+"\n");
             }
         }
-        lastLocation = loc; // random comment
+        lastLocation = loc;
         tvDistance.setText(String.valueOf(distance));
         tvVelocity.setText(String.valueOf(loc.getSpeed()));
 
